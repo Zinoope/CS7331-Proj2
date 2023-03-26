@@ -64,28 +64,28 @@ cases_cleaned <- cases_filtered %>% select(county_name,
                                            confirmed_cases_P1000,
                                            deaths_P1000,
                                            # first Subset
-                                              # gender/Ethnicity and age
+                                           # gender/Ethnicity and age
                                            female_pop_P100,
                                            male_pop_P100,
                                            female_under_40_ratio,
                                            male_under_40_ratio,
-                                              # habits and interactions
+                                           # habits and interactions
                                            walked_to_work_P1000,
                                            commuters_by_public_transportation_P1000,
                                            commuters_by_carpool_P1000,
                                            commuters_drove_alone_P1000,
-                                              # financial related
+                                           # financial related
                                            income_per_capita,
                                            
                                            # Second Subset
-                                              # gender/Ethnicity and age
+                                           # gender/Ethnicity and age
                                            asian_pop_P1000,
                                            black_pop_P1000,
                                            hispanic_pop_P1000,
                                            median_age,
-                                              # habits and interactions
+                                           # habits and interactions
                                            pop_density_Pkm,
-                                              # financial related
+                                           # financial related
                                            median_income,
                                            
                                            
@@ -101,7 +101,7 @@ counties <- as_tibble(map_data("county"))
 counties_OH <- counties %>% dplyr::filter(region == "ohio") %>% 
   rename(c(county = subregion))
 cases_OH <- cases_cleaned %>% mutate(county = county_name %>% 
-                                  str_to_lower() %>% str_replace('\\s+county\\s*$', ''))
+                                       str_to_lower() %>% str_replace('\\s+county\\s*$', ''))
 
 counties_OH_clust <- counties_OH %>% left_join(cases_OH)
 rm(counties,counties_OH,cases_OH)
@@ -128,31 +128,31 @@ rm(cases_map, deaths_map)
 # 1. select attributes and scale the values to Z-scores ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 subset01_to_cluster <- subset(cases_cleaned, select = ( c(
-    # gender/Ethnicity and age
+  # gender/Ethnicity and age
   female_pop_P100,
   male_pop_P100,
   female_under_40_ratio,
   male_under_40_ratio,
-    # habits and interactions
+  # habits and interactions
   walked_to_work_P1000,
   commuters_by_public_transportation_P1000,
   commuters_by_carpool_P1000,
   commuters_drove_alone_P1000,
-    # financial related
+  # financial related
   income_per_capita
-  ))) %>% scale() %>% as_tibble()
+))) %>% scale() %>% as_tibble()
 subset01_to_cluster <- subset01_to_cluster %>% add_column(county_name = cases_cleaned$county_name) 
 summary(subset01_to_cluster)  
 
 subset02_to_cluster <- subset(cases_cleaned, select = ( c(
-    # gender/Ethnicity and age
+  # gender/Ethnicity and age
   asian_pop_P1000,
   black_pop_P1000,
   hispanic_pop_P1000,
   median_age,
-    # habits and interactions
+  # habits and interactions
   pop_density_Pkm,
-    # financial related
+  # financial related
   median_income
 ))) %>% scale() %>% as_tibble()
 subset02_to_cluster <- subset02_to_cluster %>% add_column(county_name = cases_cleaned$county_name)
@@ -264,14 +264,14 @@ km02=kmeans(subset02_to_cluster %>% select(-county_name), centers = k02, nstart 
 # displaying details of the cluster:
 ggplot(pivot_longer(as_tibble(km01$centers,  rownames = "cluster"), 
                     cols = colnames(km01$centers)), 
-                    aes(y = name, x = value)) +
-                    geom_bar(stat = "identity") +
-                    facet_grid(rows = vars(cluster))
+       aes(y = name, x = value)) +
+  geom_bar(stat = "identity") +
+  facet_grid(rows = vars(cluster))
 ggplot(pivot_longer(as_tibble(km02$centers,  rownames = "cluster"), 
                     cols = colnames(km02$centers)), 
-                    aes(y = name, x = value)) +
-                    geom_bar(stat = "identity") +
-                    facet_grid(rows = vars(cluster))
+       aes(y = name, x = value)) +
+  geom_bar(stat = "identity") +
+  facet_grid(rows = vars(cluster))
 
 # Last step: visualize the clusters in small adjacent maps:
 
@@ -282,7 +282,7 @@ counties_OH <- counties %>% dplyr::filter(region == "ohio") %>%
 #a. first subset
 
 cases_OH <- subset01_to_cluster %>% mutate(county = county_name %>% 
-                                  str_to_lower() %>% str_replace('\\s+county\\s*$', ''))
+                                             str_to_lower() %>% str_replace('\\s+county\\s*$', ''))
 
 counties_OH_clust <- counties_OH %>% left_join(cases_OH %>% 
                                                  add_column(cluster = factor(km01$cluster)))
@@ -311,9 +311,126 @@ cowplot::plot_grid(km01_viz, km02_viz, nrow = 1, ncol = 2)
 
 ## Step II-03:  Hierarchical --------------------------------------------------------
 
+## Step 1: Add Outliers Back in. We don't need to account for outliers in Hierarchical Clustering
+subset01_to_cluster <- subset(cases_cleaned, select = ( c(
+  # gender/Ethnicity and age
+  female_pop_P100,
+  male_pop_P100,
+  female_under_40_ratio,
+  male_under_40_ratio,
+  # habits and interactions
+  walked_to_work_P1000,
+  commuters_by_public_transportation_P1000,
+  commuters_by_carpool_P1000,
+  commuters_drove_alone_P1000,
+  # financial related
+  income_per_capita
+))) %>% scale() %>% as_tibble()
+subset01_to_cluster <- subset01_to_cluster %>% add_column(county_name = cases_cleaned$county_name) 
+
+subset02_to_cluster <- subset(cases_cleaned, select = ( c(
+  # gender/Ethnicity and age
+  asian_pop_P1000,
+  black_pop_P1000,
+  hispanic_pop_P1000,
+  median_age,
+  # habits and interactions
+  pop_density_Pkm,
+  # financial related
+  median_income
+))) %>% scale() %>% as_tibble()
+subset02_to_cluster <- subset02_to_cluster %>% add_column(county_name = cases_cleaned$county_name)
+
+#Step 2: Perform the Clusters
+
+# Complete Method
+d_h <- dist(subset01_to_cluster)
+hc_1_complete <- hclust(d_h, method='complete')
+plot(hc_1_complete, hang = -1)
 
 
+d_h_2 <- dist(subset02_to_cluster)
+hc_2_complete <- hclust(d_h_2, method='complete')
+plot(hc_2_complete, hang = -1)
 
 
+# Ward's Method
+d_h_ward <- dist(subset01_to_cluster)
+hc_1_wards <- hclust(d_h, method='ward.D2')
+plot(hc_1_wards, hang = -1)
 
+d_h_2_ward <- dist(subset02_to_cluster)
+hc_2_wards <- hclust(d_h_2, method='ward.D2')
+plot(hc_2_wards, hang = -1)
+
+library(factoextra)
+
+#Cluster Numbers are based on values extracted from k-means
+fviz_dend(hc_1_complete,k=7,show_labels = TRUE, main ="Hierarchical, Complete, Subset 1")
+fviz_dend(hc_2_complete,k=9,show_labels = TRUE, main ="Hierarchical, Complete, Subset 2")
+
+fviz_dend(hc_1_wards,k=7,show_labels = TRUE, main ="Hierarchical, Wards, Subset 1")
+fviz_dend(hc_2_wards,k=9,show_labels = TRUE, main ="Hierarchical, Wards, Subset 2")
+
+cases_OH <- subset01_to_cluster %>% mutate(county = county_name %>% 
+                                             str_to_lower() %>% str_replace('\\s+county\\s*$', ''))
+
+#Visualizing Hierarchical in Map
+
+#Subset 1
+counties <- as_tibble(map_data("county"))
+counties_OH <- counties %>% dplyr::filter(region == "ohio") %>% 
+  rename(c(county = subregion))
+
+clusters <- cutree(hc_1_complete, k = 7)
+
+counties_OH_clust <- counties_OH %>% left_join(cases_OH %>% 
+                                                 add_column(cluster = factor(clusters)))
+hc01_c_viz <- ggplot(counties_OH_clust, aes(long, lat)) + 
+  geom_polygon(aes(group = group, fill = cluster)) +
+  coord_quickmap() + 
+  scale_fill_viridis_d() + 
+  theme_minimal()+
+  labs(title = "Hierarchical Clusters", subtitle = "Complete [Subset 01]")
+
+#Subset 2
+clusters <- cutree(hc_2_complete, k = 9)
+
+counties_OH_clust <- counties_OH %>% left_join(cases_OH %>% 
+                                                 add_column(cluster = factor(clusters)))
+hc02_c_viz <- ggplot(counties_OH_clust, aes(long, lat)) + 
+  geom_polygon(aes(group = group, fill = cluster)) +
+  coord_quickmap() + 
+  scale_fill_viridis_d() + 
+  theme_minimal()+
+  labs(title = "Hierarchical Clusters", subtitle = "Complete [Subset 02]")
+
+cowplot::plot_grid(hc01_c_viz, hc02_c_viz, nrow = 1, ncol = 2)
+
+#Plotting Ward's Method --------------------------------------------------------
+#Subset 01
+clusters <- cutree(hc_1_wards, k = 7)
+
+counties_OH_clust <- counties_OH %>% left_join(cases_OH %>% 
+                                                 add_column(cluster = factor(clusters)))
+hc01_w_viz <- ggplot(counties_OH_clust, aes(long, lat)) + 
+  geom_polygon(aes(group = group, fill = cluster)) +
+  coord_quickmap() + 
+  scale_fill_viridis_d() + 
+  theme_minimal()+
+  labs(title = "Hierarchical Clusters", subtitle = "Ward's [Subset 01]")
+
+clusters <- cutree(hc_2_wards, k = 9)
+
+#Subset 2
+counties_OH_clust <- counties_OH %>% left_join(cases_OH %>% 
+                                                 add_column(cluster = factor(clusters)))
+hc02_w_viz <- ggplot(counties_OH_clust, aes(long, lat)) + 
+  geom_polygon(aes(group = group, fill = cluster)) +
+  coord_quickmap() + 
+  scale_fill_viridis_d() + 
+  theme_minimal()+
+  labs(title = "Hierarchical Clusters", subtitle = "Ward's [Subset 02]")
+
+cowplot::plot_grid(hc01_w_viz, hc02_w_viz, nrow = 1, ncol = 2)
 
