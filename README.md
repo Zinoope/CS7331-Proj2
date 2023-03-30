@@ -9,13 +9,13 @@ The data was retreived on 3/22/2023 from Google cloud website, using the followi
 You can review it using the following link:
 https://console.cloud.google.com/marketplace/details/usafacts-public-data/covid19-us-cases?filter=solution-type:dataset&filter=category:covid19&id=3eaff9c5-fbaf-47bb-a441-89db1e1395ab
 
-2. US Census Data
-   Publisher: United States Census Bureau
-You can review it using the following link:
+2. US Census Data  
+   Publisher: United States Census Bureau  
+You can review it using the following link:  
 https://console.cloud.google.com/marketplace/details/united-states-census-bureau/us-census-data
 
-3. Census Bureau US Boundaries:
-   Publisher: United States Census Bureau
+3. Census Bureau US Boundaries:  
+   Publisher: United States Census Bureau  
 You can review it using the following link:
 https://console.cloud.google.com/marketplace/details/united-states-census-bureau/us-geographic-boundaries
 
