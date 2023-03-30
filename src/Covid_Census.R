@@ -7,6 +7,7 @@ library("ggrepel")
 library("DT")
 library("NbClust")
 library("dbscan")
+library("seriation")
 cases <- read_csv("../data/Ohio Covid 03-05 + Census 2020-5yrs + Geo Boundaries.csv")
 cases <- cases %>% mutate_if(is.character, factor)
 cases
@@ -119,7 +120,7 @@ cases_map <- ggplot(counties_OH_clust, aes(long, lat)) +
   labs(title = "Cases in Ohio State", fill = "Cases per 1000")
 
 cowplot::plot_grid(deaths_map, cases_map, nrow = 1, ncol = 2)
-rm(cases_map, deaths_map)
+rm(counties_OH_clust, cases_map, deaths_map)
 
 ### PART II: clustering ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -167,7 +168,8 @@ PCA <- as_tibble(PCA$x)  %>% add_column(county_name = cases_cleaned$county_name)
 lof <- lof(as_tibble(PCA$PC1,PCA$PC2), minPts= 10)
 ggplot(PCA %>% add_column(lof = lof), aes(PC1, PC2, color = lof)) +
   geom_point() + scale_color_gradient(low = "gray", high = "red")+
-  geom_text_repel(aes(label = county_name), vjust = -1)
+  geom_text_repel(aes(label = county_name), vjust = -1)+
+  labs(title = "PCA outlier analysis", subtitle="Subset 01", fill = "Local Outlier Factor")
 
 ggplot(PCA %>% add_column(outlier = lof >= 5), aes(PC1, PC2, color = outlier)) +
   geom_point()+
@@ -196,7 +198,7 @@ rm(PCA, lof)
 
 ## Step II-02:  K-Means -------------------------------------------------------------
 
-# 1- find the number of clusters
+# 1- find the number of clusters ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 # A- Subset 01:
 # A-1-1 Elbow Method: Within-Cluster Sum of Squares
 set.seed(1234)
@@ -236,9 +238,7 @@ WCSS <- sapply(ks, FUN = function(k) {
   kmeans(subset02_to_cluster %>% select(-county_name), centers = k, nstart = 1000)$tot.withinss
 })
 
-WCSS_viz <- ggplot(as_tibble(ks, WCSS), aes(ks, WCSS)) + geom_line() +
-  geom_vline(xintercept = 9, color = "red", linetype = 2)+
-  geom_vline(xintercept = 7, color = "blue", linetype = 2)
+WCSS_viz <- ggplot(as_tibble(ks, WCSS), aes(ks, WCSS)) + geom_line() 
 
 # A-1-2 Average Silhouette Width
 d <- dist(subset02_to_cluster %>% select(-county_name))
@@ -248,20 +248,21 @@ ASW <- sapply(ks, FUN=function(k) {
   fpc::cluster.stats(d, kmeans(subset02_to_cluster %>% select(-county_name), centers=k, nstart = 1000)$cluster)$avg.silwidth
 })
 
-ASW_viz <- ggplot(as_tibble(ks, ASW), aes(ks, ASW)) + geom_line() +
-  geom_vline(xintercept = 9, color = "red", linetype = 2)+
-  geom_vline(xintercept = 7, color = "blue", linetype = 2)
+ASW_viz <- ggplot(as_tibble(ks, ASW), aes(ks, ASW)) + geom_line()
+
 
 cowplot::plot_grid(WCSS_viz, ASW_viz, nrow = 1, ncol = 2)
 
 k02=9
 km02=kmeans(subset02_to_cluster %>% select(-county_name), centers = k02, nstart = 1000)
 
+rm(ASW,ASW_viz,WCSS,WCSS_viz,d,ks)
 
 #NbClust(data = subset02_to_cluster, diss = NULL, distance = "euclidean", min.nc = 2, max.nc = 15,
 #        method = "kmeans", index = "all", alphaBeale = 0.1)
 
-# displaying details of the cluster:
+# 2. displaying details of the cluster ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
 ggplot(pivot_longer(as_tibble(km01$centers,  rownames = "cluster"), 
                     cols = colnames(km01$centers)), 
                     aes(y = name, x = value)) +
@@ -273,7 +274,7 @@ ggplot(pivot_longer(as_tibble(km02$centers,  rownames = "cluster"),
                     geom_bar(stat = "identity") +
                     facet_grid(rows = vars(cluster))
 
-# Last step: visualize the clusters in small adjacent maps:
+# visualize the clusters in small adjacent maps:
 
 counties <- as_tibble(map_data("county"))
 counties_OH <- counties %>% dplyr::filter(region == "ohio") %>% 
@@ -308,6 +309,16 @@ km02_viz <- ggplot(counties_OH_clust, aes(long, lat)) +
   labs(title = "Clusters", subtitle = "Kmeans [Subset 02]")
 
 cowplot::plot_grid(km01_viz, km02_viz, nrow = 1, ncol = 2)
+
+
+# 3- performing some internal validation visualizations:
+d<- dist(subset01_to_cluster %>% select(-county_name))
+pimage(d, order=order(km01$cluster), col = bluered(100))
+dissplot(d, labels = km01$cluster, options=list(main="k-means with k=7"))
+
+d<- dist(subset02_to_cluster %>% select(-county_name))
+pimage(d, order=order(km02$cluster), col = bluered(100))
+dissplot(d, labels = km02$cluster, options=list(main="k-means with k=9"))
 
 ## Step II-03:  Hierarchical --------------------------------------------------------
 
