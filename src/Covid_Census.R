@@ -113,7 +113,7 @@ deaths_map <- ggplot(counties_OH_clust, aes(long, lat)) +
   coord_quickmap() +
   scale_fill_continuous(type = "viridis") +
   labs(title = "Deaths in Ohio State", fill = "Deaths per 1000")
-cases_map <- ggplot(counties_OH_clust, aes(long, lat)) + 
+cases_map <- ggplot(counties_OH_clust, aes(long, lat)) +
   geom_polygon(aes(group = group, fill = confirmed_cases_P1000)) +
   coord_quickmap() +
   scale_fill_continuous(type = "viridis") +
@@ -161,40 +161,42 @@ summary(subset02_to_cluster)
 
 # 2. perform a PCA analysis and remove outliers ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 
 # a- subset 01:
-PCA <- subset01_to_cluster %>% select(-county_name) %>% prcomp()
+PCA1 <- subset01_to_cluster %>% select(-county_name) %>% prcomp()
 
-PCA <- as_tibble(PCA$x)  %>% add_column(county_name = cases_cleaned$county_name)
+PCA1 <- as_tibble(PCA1$x)  %>% add_column(county_name = cases_cleaned$county_name)
 
-lof <- lof(as_tibble(PCA$PC1,PCA$PC2), minPts= 10)
-ggplot(PCA %>% add_column(lof = lof), aes(PC1, PC2, color = lof)) +
+lof <- lof(as_tibble(PCA1$PC1,PCA1$PC2), minPts= 10)
+ggplot(PCA1 %>% add_column(lof = lof), aes(PC1, PC2, color = lof)) +
   geom_point() + scale_color_gradient(low = "gray", high = "red")+
   geom_text_repel(aes(label = county_name), vjust = -1)+
   labs(title = "PCA outlier analysis", subtitle="Subset 01", fill = "Local Outlier Factor")
 
-ggplot(PCA %>% add_column(outlier = lof >= 5), aes(PC1, PC2, color = outlier)) +
+ggplot(PCA1 %>% add_column(outlier = lof >= 5), aes(PC1, PC2, color = outlier)) +
   geom_point()+
-  geom_text_repel(aes(label = county_name), vjust = -1)
+  geom_text_repel(aes(label = county_name), vjust = -1)+
+  labs(title = "PCA outlier analysis", subtitle="Subset 01 - lof >=5 marked true", fill = "Local Outlier Factor")
+
 
 subset01_to_cluster <- subset01_to_cluster %>% filter(lof < 5) 
 
 # b- subset 02:
-PCA <- subset02_to_cluster %>% select(-county_name) %>% prcomp()
+PCA2 <- subset02_to_cluster %>% select(-county_name) %>% prcomp()
 
-PCA <- as_tibble(PCA$x)  %>% add_column(county_name = cases_cleaned$county_name)
+PCA2 <- as_tibble(PCA2$x)  %>% add_column(county_name = cases_cleaned$county_name)
 
-lof <- lof(as_tibble(PCA$PC1,PCA$PC2), minPts= 10)
-ggplot(PCA %>% add_column(lof = lof), aes(PC1, PC2, color = lof)) +
+lof <- lof(as_tibble(PCA2$PC1,PCA2$PC2), minPts= 10)
+ggplot(PCA2 %>% add_column(lof = lof), aes(PC1, PC2, color = lof)) +
   geom_point() + scale_color_gradient(low = "gray", high = "red")+
   geom_text_repel(aes(label = county_name), vjust = -1)
 
-ggplot(PCA %>% add_column(outlier = lof >= 1.75), aes(PC1, PC2, color = outlier)) +
+ggplot(PCA2 %>% add_column(outlier = lof >= 1.75), aes(PC1, PC2, color = outlier)) +
   geom_point()+
   geom_text_repel(aes(label = county_name), vjust = -1)
 
 subset02_to_cluster <- subset02_to_cluster %>% filter(lof < 1.75) 
 
 
-rm(PCA, lof)
+rm(lof)
 
 ## Step II-02:  K-Means -------------------------------------------------------------
 
@@ -214,17 +216,26 @@ WCSS_viz <- ggplot(as_tibble(ks, WCSS), aes(ks, WCSS)) + geom_line() +
 
 # A-1-2 Average Silhouette Width
 d <- dist(subset01_to_cluster %>% select(-county_name))
+d_m <- dist(subset01_to_cluster %>% select(-county_name), method = "manhattan")
 
 
 ASW <- sapply(ks, FUN=function(k) {
   fpc::cluster.stats(d, kmeans(subset01_to_cluster %>% select(-county_name), centers=k, nstart = 1000)$cluster)$avg.silwidth
 })
 
+ASW_m <- sapply(ks, FUN=function(k) {
+  fpc::cluster.stats(d_m, kmeans(subset01_to_cluster %>% select(-county_name), centers=k, nstart = 1000)$cluster)$avg.silwidth
+})
+
 ASW_viz <- ggplot(as_tibble(ks, ASW), aes(ks, ASW)) + geom_line() +
   geom_vline(xintercept = 8, color = "red", linetype = 2)+
   geom_vline(xintercept = 7, color = "blue", linetype = 2)
 
-cowplot::plot_grid(WCSS_viz, ASW_viz, nrow = 1, ncol = 2)
+ASW_m_viz <- ggplot(as_tibble(ks, ASW_m), aes(ks, ASW_m)) + geom_line() +
+  geom_vline(xintercept = 8, color = "red", linetype = 2)+
+  geom_vline(xintercept = 7, color = "blue", linetype = 2)
+
+cowplot::plot_grid(WCSS_viz, ASW_viz, ASW_m_viz, nrow = 1, ncol = 3)
 
 k01=7
 km01=kmeans(subset01_to_cluster %>% select(-county_name), centers = k01, nstart = 1000)
@@ -238,43 +249,84 @@ WCSS <- sapply(ks, FUN = function(k) {
   kmeans(subset02_to_cluster %>% select(-county_name), centers = k, nstart = 1000)$tot.withinss
 })
 
-WCSS_viz <- ggplot(as_tibble(ks, WCSS), aes(ks, WCSS)) + geom_line() 
+WCSS_viz <- ggplot(as_tibble(ks, WCSS), aes(ks, WCSS)) + geom_line()+
+  geom_vline(xintercept = 9, color = "red", linetype = 2)+
+  geom_vline(xintercept = 8, color = "blue", linetype = 2) 
 
 # A-1-2 Average Silhouette Width
 d <- dist(subset02_to_cluster %>% select(-county_name))
+d_m <- dist(subset02_to_cluster %>% select(-county_name), method = "manhattan")
 
 
 ASW <- sapply(ks, FUN=function(k) {
   fpc::cluster.stats(d, kmeans(subset02_to_cluster %>% select(-county_name), centers=k, nstart = 1000)$cluster)$avg.silwidth
 })
 
-ASW_viz <- ggplot(as_tibble(ks, ASW), aes(ks, ASW)) + geom_line()
+ASW_m <- sapply(ks, FUN=function(k) {
+  fpc::cluster.stats(d_m, kmeans(subset02_to_cluster %>% select(-county_name), centers=k, nstart = 1000)$cluster)$avg.silwidth
+})
+
+ASW_viz <- ggplot(as_tibble(ks, ASW), aes(ks, ASW)) + geom_line()+
+  geom_vline(xintercept = 9, color = "red", linetype = 2)+
+  geom_vline(xintercept = 8, color = "blue", linetype = 2)
+
+ASW_m_viz <- ggplot(as_tibble(ks, ASW_m), aes(ks, ASW_m)) + geom_line() +
+  geom_vline(xintercept = 9, color = "red", linetype = 2)+
+  geom_vline(xintercept = 8, color = "blue", linetype = 2)
 
 
-cowplot::plot_grid(WCSS_viz, ASW_viz, nrow = 1, ncol = 2)
+cowplot::plot_grid(WCSS_viz, ASW_viz, ASW_m_viz, nrow = 1, ncol = 3)
 
 k02=9
 km02=kmeans(subset02_to_cluster %>% select(-county_name), centers = k02, nstart = 1000)
 
-rm(ASW,ASW_viz,WCSS,WCSS_viz,d,ks)
+rm(ASW,ASW_m,ASW_viz,ASW_m_viz,WCSS,WCSS_viz,d,d_m,ks)
 
 #NbClust(data = subset02_to_cluster, diss = NULL, distance = "euclidean", min.nc = 2, max.nc = 15,
-#        method = "kmeans", index = "all", alphaBeale = 0.1)
+#       method = "kmeans", index = "all", alphaBeale = 0.1)
 
 # 2. displaying details of the cluster ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+# 2.1 visulaizing them in a 2d plot
 
-ggplot(pivot_longer(as_tibble(km01$centers,  rownames = "cluster"), 
-                    cols = colnames(km01$centers)), 
-       aes(y = name, x = value)) +
-  geom_bar(stat = "identity") +
-  facet_grid(rows = vars(cluster))
-ggplot(pivot_longer(as_tibble(km02$centers,  rownames = "cluster"), 
-                    cols = colnames(km02$centers)), 
-       aes(y = name, x = value)) +
-  geom_bar(stat = "identity") +
-  facet_grid(rows = vars(cluster))
+#subset 1
+PCA1 <- subset01_to_cluster %>% select(-county_name) %>% prcomp()
+PCA1 <- as_tibble(PCA1$x)  
+TO_PLOT<- PCA1 %>% select(PC1, PC2)
 
-# visualize the clusters in small adjacent maps:
+library(factoextra)
+cluster_01_prof <- fviz_cluster(km01, data = TO_PLOT, centroids = TRUE, repel = TRUE, ellipse.type = "norm")+
+  geom_text(aes(label = ""), alpha = 0)
+
+#subset 2
+PCA2 <- subset02_to_cluster %>% select(-county_name) %>% prcomp()
+PCA2 <- as_tibble(PCA2$x)  
+TO_PLOT<- PCA2 %>% select(PC1, PC2)
+
+cluster_02_prof <-fviz_cluster(km02, data = TO_PLOT, centroids = TRUE, repel = TRUE, ellipse.type = "norm")
+
+cowplot::plot_grid(cluster_01_prof, cluster_02_prof, nrow = 2, ncol = 1)
+
+
+# 2.2 showing the deailed diffrences
+details_s1 <- ggplot(pivot_longer(as_tibble(km01$centers,  rownames = "cluster"), 
+  cols = colnames(km01$centers)), 
+  aes(y = name, x = value, fill = cluster)) +
+  geom_bar(stat = "identity") +
+  facet_grid(rows = vars(cluster))+
+  labs(title = "Subset 01")
+
+details_s2 <- ggplot(pivot_longer(as_tibble(km02$centers,  rownames = "cluster"), 
+  cols = colnames(km02$centers)), 
+  aes(y = name, x = value, fill = cluster)) +
+  geom_bar(stat = "identity") +
+  facet_grid(rows = vars(cluster))+
+  labs(title = "Subset 02")
+
+cowplot::plot_grid(details_s1, details_s2,nrow = 1, ncol = 2) # used w=900, h=800 to export
+
+rm(details_s1, details_s2) 
+
+#  visualize the clusters in small adjacent maps:
 
 counties <- as_tibble(map_data("county"))
 counties_OH <- counties %>% dplyr::filter(region == "ohio") %>% 
@@ -319,6 +371,87 @@ dissplot(d, labels = km01$cluster, options=list(main="k-means with k=7"))
 d<- dist(subset02_to_cluster %>% select(-county_name))
 pimage(d, order=order(km02$cluster), col = bluered(100))
 dissplot(d, labels = km02$cluster, options=list(main="k-means with k=9"))
+
+## Step II-03: External validation: -------------------------------------------------
+# defining the functions:
+entropy <- function(cluster, truth) {
+  k <- max(cluster, truth)
+  cluster <- factor(cluster, levels = 1:k)
+  truth <- factor(truth, levels = 1:k)
+  w <- table(cluster)/length(cluster)
+  
+  cnts <- sapply(split(truth, cluster), table)
+  p <- sweep(cnts, 1, rowSums(cnts), "/")
+  p[is.nan(p)] <- 0
+  e <- -p * log(p, 2)
+  
+  sum(w * rowSums(e, na.rm = TRUE))
+}
+
+purity <- function(cluster, truth) {
+  k <- max(cluster, truth)
+  cluster <- factor(cluster, levels = 1:k)
+  truth <- factor(truth, levels = 1:k)
+  w <- table(cluster)/length(cluster)
+  
+  cnts <- sapply(split(truth, cluster), table)
+  p <- sweep(cnts, 1, rowSums(cnts), "/")
+  p[is.nan(p)] <- 0
+  
+  sum(w * apply(p, 1, max))
+}
+
+# sub 01
+d_s_01 <- dist(subset01_to_cluster %>% select(- county_name))
+d_s_02 <- dist(subset02_to_cluster %>% select(- county_name))
+
+truth_cases_s1 <- cases_cleaned %>% filter(county_name != "Noble County") %>%
+  select(confirmed_cases_P1000) %>%
+  scale() %>% 
+  kmeans(centers = k01, nstart = 1000)
+truth_cases_s1  <- truth_cases_s1$cluster
+
+truth_deaths_s1 <- cases_cleaned %>% filter(county_name != "Noble County") %>%
+  select(deaths_P1000) %>%
+  scale() %>% 
+  kmeans(centers = k01, nstart = 1000)
+truth_deaths_s1  <- truth_deaths_s1$cluster
+
+truth_cases_s2 <- cases_cleaned %>% filter(county_name != "Franklin County") %>%
+  select(confirmed_cases_P1000) %>%
+  scale() %>% 
+  kmeans(centers = k02, nstart = 1000)
+truth_cases_s2  <- truth_cases_s2$cluster
+
+truth_deaths_s2 <- cases_cleaned %>% filter(county_name != "Franklin County") %>%
+  select(deaths_P1000) %>%
+  scale() %>% 
+  kmeans(centers = k02, nstart = 1000)
+truth_deaths_s2  <- truth_deaths_s2$cluster
+
+
+r <- rbind(
+  kmeans_1_cases = c(
+    unlist(fpc::cluster.stats(d_s_01, km01$cluster, truth_cases_s1, compareonly = TRUE)),
+    entropy = entropy(km01$cluster, truth_cases_s1),
+    purity = purity(km01$cluster, truth_cases_s1)
+  ),
+  kmeans_2_cases = c(
+    unlist(fpc::cluster.stats(d_s_02, km02$cluster, truth_cases_s2, compareonly = TRUE)),
+    entropy = entropy(km02$cluster, truth_cases_s2),
+    purity = purity(km02$cluster, truth_cases_s2)
+  ),
+  kmeans_1_deaths = c(
+    unlist(fpc::cluster.stats(d_s_01, km01$cluster, truth_deaths_s1, compareonly = TRUE)),
+    entropy = entropy(km01$cluster, truth_deaths_s1),
+    purity = purity(km01$cluster, truth_deaths_s1)
+  ),
+  kmeans_2_deaths = c(
+    unlist(fpc::cluster.stats(d_s_02, km02$cluster, truth_deaths_s2, compareonly = TRUE)),
+    entropy = entropy(km02$cluster, truth_deaths_s2),
+    purity = purity(km02$cluster, truth_deaths_s2)
+  ))
+r
 
 ## Step II-03:  Hierarchical --------------------------------------------------------
 
