@@ -364,13 +364,21 @@ cowplot::plot_grid(km01_viz, km02_viz, nrow = 1, ncol = 2)
 
 
 # 3- performing some internal validation visualizations:
+library(cluster)
 d<- dist(subset01_to_cluster %>% select(-county_name))
 pimage(d, order=order(km01$cluster), col = bluered(100))
 dissplot(d, labels = km01$cluster, options=list(main="k-means with k=7"))
 
-d<- dist(subset02_to_cluster %>% select(-county_name))
+sil_km01 <- fviz_silhouette(silhouette(km01$cluster, d))
+
+
+d <- dist(subset02_to_cluster %>% select(-county_name))
 pimage(d, order=order(km02$cluster), col = bluered(100))
 dissplot(d, labels = km02$cluster, options=list(main="k-means with k=9"))
+
+sil_km02 <- fviz_silhouette(silhouette(km02$cluster, d))
+
+cowplot::plot_grid(sil_km01, sil_km02, nrow = 2, ncol = 1)
 
 ## Step II-03: External validation: -------------------------------------------------
 # defining the functions:
@@ -452,6 +460,27 @@ r <- rbind(
     purity = purity(km02$cluster, truth_deaths_s2)
   ))
 r
+
+## show classes averages:
+# define the truth
+truth_s1_notscaled <- cases_cleaned %>% filter(county_name != "Noble County") %>%
+  select(deaths_P1000, confirmed_cases_P1000)
+
+truth_s2_notscaled <- cases_cleaned %>% filter(county_name != "Franklin County") %>%
+  select(deaths_P1000, confirmed_cases_P1000)
+
+# do the summary
+#s1km1
+combined_clust_truth_s1_km1 <- as_tibble(km01$cluster) %>% mutate(cases_per_1000= truth_s1_notscaled$confirmed_cases_P1000,
+                                                                  deaths_per_1000=truth_s1_notscaled$deaths_P1000)
+combined_clust_truth_s1_km1 %>% group_by(value) %>% 
+  summarise(mean_deaths_per_1000 = mean(deaths_per_1000), mean_cases_per_1000 = mean(cases_per_1000))
+#s2km2
+combined_clust_truth_s2_km2 <- as_tibble(km02$cluster) %>% mutate(cases_per_1000= truth_s2_notscaled$confirmed_cases_P1000,
+                                                                  deaths_per_1000=truth_s2_notscaled$deaths_P1000)
+combined_clust_truth_s2_km2 %>% group_by(value) %>% 
+  summarise(mean_deaths_per_1000 = mean(deaths_per_1000), mean_cases_per_1000 = mean(cases_per_1000))
+
 
 ## Step II-03:  Hierarchical --------------------------------------------------------
 
